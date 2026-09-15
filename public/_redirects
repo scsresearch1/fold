@@ -1,0 +1,3 @@
+/api/inbox    /.netlify/functions/inbox   200
+/api/health   /.netlify/functions/inbox   200
+/*    /index.html   200

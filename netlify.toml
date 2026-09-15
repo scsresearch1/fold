@@ -1,0 +1,35 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  node_bundler = "esbuild"
+  directory = "netlify/functions"
+
+[functions.inbox]
+  # IMAP connect + fetch can take a few seconds
+  timeout = 26
+  included_files = ["server/**"]
+
+# Proxy the SPA's /api/* calls to the serverless function
+[[redirects]]
+  from = "/api/inbox"
+  to = "/.netlify/functions/inbox"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/inbox"
+  status = 200
+  force = true
+
+# SPA fallback for client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

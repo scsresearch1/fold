@@ -10,7 +10,8 @@
     "start:imap": "node server/imap-server.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "netlify:dev": "netlify dev"
   },
   "dependencies": {
     "cors": "^2.8.6",
