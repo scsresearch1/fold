@@ -6,7 +6,6 @@ type LandingProps = {
   ready: boolean
   providerLabel: string
   onConnect: () => void
-  onDemo: () => void
   onOpenSettings: () => void
 }
 
@@ -16,7 +15,6 @@ export function Landing({
   ready,
   providerLabel,
   onConnect,
-  onDemo,
   onOpenSettings,
 }: LandingProps) {
   return (
@@ -28,8 +26,8 @@ export function Landing({
           <span>into action.</span>
         </h1>
         <p className="hero-sub">
-          Connect any email account, then turn messages into plain-language action items you can
-          check off — no digging through subjects and snippets.
+          Connect any email account, then turn unread messages into plain-language action items you
+          can check off — no digging through subjects and snippets.
         </p>
 
         <div className="cta-row">
@@ -38,9 +36,6 @@ export function Landing({
           </button>
           <button className="btn btn-ghost" onClick={onOpenSettings} disabled={loading}>
             Email settings
-          </button>
-          <button className="btn btn-ghost" onClick={onDemo} disabled={loading}>
-            Try demo inbox
           </button>
         </div>
 

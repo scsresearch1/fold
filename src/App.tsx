@@ -52,11 +52,9 @@ export default function App() {
     connected,
     loading,
     error,
-    usingDemo,
     activeLabel,
     lastCheckedAt,
     connect,
-    loadDemo,
     refresh,
     toggleTask,
     clearCompleted,
@@ -130,12 +128,10 @@ export default function App() {
             ready={ready}
             providerLabel={provider.label}
             onConnect={connect}
-            onDemo={loadDemo}
             onOpenSettings={() => setSettingsOpen(true)}
           />
         ) : (
           <Workspace
-            usingDemo={usingDemo}
             activeLabel={activeLabel}
             loading={loading}
             doneCount={doneCount}

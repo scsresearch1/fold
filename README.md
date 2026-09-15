@@ -42,7 +42,7 @@ This starts:
 - the Vite app at http://localhost:5173
 - a local IMAP bridge at http://localhost:8787 (needed for Yahoo, iCloud, Zoho, and custom mail)
 
-Open **Settings** (gear button) to connect an account, or use **Try demo inbox**.
+Open **Settings** (gear button) to connect an email account.
 
 ## Connect any email
 

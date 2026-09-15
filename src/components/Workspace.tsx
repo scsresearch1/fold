@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { APP_NAME } from '../config'
 
 type WorkspaceProps = {
-  usingDemo: boolean
   activeLabel: string
   loading: boolean
   doneCount: number
@@ -16,7 +15,6 @@ type WorkspaceProps = {
 }
 
 export function Workspace({
-  usingDemo,
   activeLabel,
   loading,
   doneCount,
@@ -38,12 +36,12 @@ export function Workspace({
       <header className="workspace-top">
         <div className="workspace-brand">
           <span className="brand-mark compact">{APP_NAME}</span>
-          <span className={`demo-pill ${usingDemo ? '' : 'is-live'}`}>{activeLabel}</span>
+          <span className="connection-pill">{activeLabel}</span>
         </div>
 
         <div className="workspace-actions">
           <button className="btn btn-ghost sm" onClick={onRefresh} disabled={loading}>
-            {loading ? 'Refreshing…' : usingDemo ? 'Simulate new mail' : 'Refresh'}
+            {loading ? 'Refreshing…' : 'Refresh'}
           </button>
           <button
             className="btn btn-ghost sm"
