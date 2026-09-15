@@ -12,7 +12,6 @@ type WorkspaceProps = {
   onRefresh: () => void
   onClearCompleted: () => void
   onSignOut: () => void
-  onOpenSettings: () => void
   children: ReactNode
 }
 
@@ -27,7 +26,6 @@ export function Workspace({
   onRefresh,
   onClearCompleted,
   onSignOut,
-  onOpenSettings,
   children,
 }: WorkspaceProps) {
   const progress = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100)
@@ -44,9 +42,6 @@ export function Workspace({
         </div>
 
         <div className="workspace-actions">
-          <button className="btn btn-ghost sm" onClick={onOpenSettings}>
-            Settings
-          </button>
           <button className="btn btn-ghost sm" onClick={onRefresh} disabled={loading}>
             {loading ? 'Refreshing…' : usingDemo ? 'Simulate new mail' : 'Refresh'}
           </button>

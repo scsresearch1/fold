@@ -145,7 +145,6 @@ export default function App() {
             onRefresh={refresh}
             onClearCompleted={clearCompleted}
             onSignOut={disconnect}
-            onOpenSettings={() => setSettingsOpen(true)}
           >
             {error && <p className="error-banner workspace-error" role="alert">{error}</p>}
             <TaskList tasks={tasks} onToggle={toggleTask} />
