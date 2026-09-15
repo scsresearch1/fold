@@ -1,6 +1,5 @@
-import type { RawEmail } from '../types'
+import type { RawEmail, Task } from '../types'
 import { rawEmailsToTasks } from './emailToTasks'
-import type { Task } from '../types'
 
 const MS_SCOPE = 'https://graph.microsoft.com/Mail.Read offline_access openid profile'
 const GRAPH = 'https://graph.microsoft.com/v1.0/me/messages'
@@ -91,13 +90,16 @@ type GraphMessage = {
   id: string
   subject?: string
   bodyPreview?: string
+  isRead?: boolean
   from?: { emailAddress?: { name?: string; address?: string } }
   receivedDateTime?: string
   conversationId?: string
 }
 
-export async function fetchOutlookInbox(accessToken: string, maxResults = 20): Promise<Task[]> {
-  const url = `${GRAPH}?$top=${maxResults}&$select=id,subject,bodyPreview,from,receivedDateTime,conversationId&$orderby=receivedDateTime desc`
+/** Unread Outlook mail only; read mail is treated as completed via sync merge. */
+export async function fetchOutlookInbox(accessToken: string, maxResults = 30): Promise<Task[]> {
+  const filter = encodeURIComponent('isRead eq false')
+  const url = `${GRAPH}?$top=${maxResults}&$filter=${filter}&$select=id,subject,bodyPreview,from,receivedDateTime,conversationId,isRead&$orderby=receivedDateTime desc`
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
@@ -115,6 +117,8 @@ export async function fetchOutlookInbox(accessToken: string, maxResults = 20): P
     from: msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || 'Unknown',
     date: msg.receivedDateTime || new Date().toISOString(),
     threadId: msg.conversationId,
+    unread: msg.isRead === false,
+    replied: false,
   }))
 
   return rawEmailsToTasks(emails)

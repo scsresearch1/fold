@@ -77,7 +77,28 @@ function decodeFrom(raw: string): string {
   return (match?.[1] || raw || 'Unknown').trim()
 }
 
-function toRawEmail(message: GmailMessage): RawEmail {
+async function threadHasSentReply(
+  accessToken: string,
+  threadId: string,
+  cache: Map<string, boolean>,
+): Promise<boolean> {
+  if (cache.has(threadId)) return cache.get(threadId) as boolean
+
+  const res = await fetch(`${GMAIL_API}/threads/${threadId}?format=minimal`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok) {
+    cache.set(threadId, false)
+    return false
+  }
+
+  const data = (await res.json()) as { messages?: { labelIds?: string[] }[] }
+  const replied = (data.messages ?? []).some((m) => m.labelIds?.includes('SENT'))
+  cache.set(threadId, replied)
+  return replied
+}
+
+function toRawEmail(message: GmailMessage, replied: boolean): RawEmail {
   const headers = message.payload?.headers
   const subject = headerValue(headers, 'Subject') || '(No subject)'
   const from = decodeFrom(headerValue(headers, 'From'))
@@ -87,6 +108,7 @@ function toRawEmail(message: GmailMessage): RawEmail {
     (message.internalDate
       ? new Date(Number(message.internalDate)).toISOString()
       : new Date().toISOString())
+  const unread = message.labelIds?.includes('UNREAD') ?? true
 
   return {
     id: message.id,
@@ -95,12 +117,15 @@ function toRawEmail(message: GmailMessage): RawEmail {
     snippet: message.snippet || '',
     from,
     date,
+    unread,
+    replied,
   }
 }
 
-export async function fetchInboxTasks(accessToken: string, maxResults = 20): Promise<Task[]> {
+/** Only unread inbox mail becomes open tasks; replied threads are marked done. */
+export async function fetchInboxTasks(accessToken: string, maxResults = 30): Promise<Task[]> {
   const listRes = await fetch(
-    `${GMAIL_API}/messages?maxResults=${maxResults}&labelIds=INBOX&q=in:inbox`,
+    `${GMAIL_API}/messages?maxResults=${maxResults}&labelIds=INBOX&q=${encodeURIComponent('in:inbox is:unread')}`,
     {
       headers: { Authorization: `Bearer ${accessToken}` },
     },
@@ -111,21 +136,27 @@ export async function fetchInboxTasks(accessToken: string, maxResults = 20): Pro
     throw new Error(`Gmail list failed (${listRes.status}): ${body}`)
   }
 
-  const listData = (await listRes.json()) as { messages?: { id: string }[] }
+  const listData = (await listRes.json()) as { messages?: { id: string; threadId?: string }[] }
   const ids = listData.messages?.map((m) => m.id) ?? []
 
   if (ids.length === 0) return []
 
-  const messages = await Promise.all(
+  const threadCache = new Map<string, boolean>()
+
+  const emails = await Promise.all(
     ids.map(async (id) => {
       const res = await fetch(
         `${GMAIL_API}/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       )
       if (!res.ok) throw new Error(`Failed to load message ${id}`)
-      return (await res.json()) as GmailMessage
+      const message = (await res.json()) as GmailMessage
+      const replied = message.threadId
+        ? await threadHasSentReply(accessToken, message.threadId, threadCache)
+        : false
+      return toRawEmail(message, replied)
     }),
   )
 
-  return rawEmailsToTasks(messages.map(toRawEmail))
+  return rawEmailsToTasks(emails)
 }

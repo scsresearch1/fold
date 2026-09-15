@@ -155,7 +155,8 @@ export function SettingsPanel({
         <section className="settings-section">
           <h3>Notifications</h3>
           <p className="settings-section-copy">
-            Fold watches for new mail while you stay connected and turns arrivals into action alerts.
+            Fold watches unread mail while you stay connected. New unread messages become tasks
+            right away; marking read or replying marks the task complete.
           </p>
 
           <label className="field-check">
@@ -164,7 +165,7 @@ export function SettingsPanel({
               checked={settings.notificationsEnabled}
               onChange={(e) => onChange({ notificationsEnabled: e.target.checked })}
             />
-            <span>Alert me when new email tasks arrive</span>
+            <span>Alert me when new unread email tasks arrive</span>
           </label>
 
           <label className="field-check">
@@ -178,17 +179,16 @@ export function SettingsPanel({
           </label>
 
           <label className="field">
-            <span>Check for new mail every (seconds)</span>
+            <span>Check for new unread mail every (seconds)</span>
             <input
               type="number"
-              min={20}
+              min={8}
               max={600}
-              step={10}
+              step={1}
               value={settings.pollIntervalSec}
               onChange={(e) =>
-                onChange({ pollIntervalSec: Math.max(20, Number(e.target.value) || 60) })
+                onChange({ pollIntervalSec: Math.max(8, Number(e.target.value) || 10) })
               }
-              disabled={!settings.notificationsEnabled}
             />
           </label>
         </section>

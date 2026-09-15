@@ -71,7 +71,7 @@ export const DEFAULT_SETTINGS: ConnectionSettings = {
   microsoftClientId: '',
   notificationsEnabled: true,
   browserNotifications: true,
-  pollIntervalSec: 60,
+  pollIntervalSec: 10,
 }
 
 const SETTINGS_KEY = 'fold-connection-settings'

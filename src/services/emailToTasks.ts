@@ -9,6 +9,8 @@ export function rawEmailsToTasks(emails: RawEmail[]): Task[] {
       from: email.from,
     })
 
+    const completed = email.replied === true || email.unread === false
+
     return {
       id: email.id,
       threadId: email.threadId,
@@ -18,7 +20,32 @@ export function rawEmailsToTasks(emails: RawEmail[]): Task[] {
       originalSubject: action.originalSubject,
       from: email.from,
       date: email.date,
-      completed: false,
+      completed,
     }
   })
+}
+
+/** Merge fresh unread-derived tasks with previous ones; mail that left unread becomes completed. */
+export function mergeMailboxTasks(previous: Task[], incoming: Task[]): Task[] {
+  const byId = new Map<string, Task>()
+
+  for (const task of previous) {
+    byId.set(task.id, task)
+  }
+
+  const incomingIds = new Set(incoming.map((t) => t.id))
+
+  for (const task of incoming) {
+    byId.set(task.id, task)
+  }
+
+  for (const [id, task] of byId) {
+    if (!incomingIds.has(id) && !task.completed) {
+      byId.set(id, { ...task, completed: true })
+    }
+  }
+
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  )
 }

@@ -60,7 +60,7 @@ export function Workspace({
 
       <div className="progress-block">
         <div className="progress-copy">
-          <h2>Action items</h2>
+          <h2>Unread action items</h2>
           <p>
             {doneCount} of {totalCount} complete
           </p>
@@ -70,8 +70,8 @@ export function Workspace({
         </div>
         <p className="watch-line">
           {notificationsOn
-            ? `Watching for new email tasks · ${checkedLabel}`
-            : `Notifications off · ${checkedLabel}`}
+            ? `Watching unread mail · new tasks appear instantly on check · ${checkedLabel}`
+            : `Syncing unread mail · ${checkedLabel}`}
         </p>
       </div>
 

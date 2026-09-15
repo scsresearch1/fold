@@ -29,6 +29,7 @@ export type GmailMessage = {
   id: string
   threadId: string
   snippet: string
+  labelIds?: string[]
   payload?: {
     headers?: GmailHeader[]
   }
@@ -92,4 +93,8 @@ export type RawEmail = {
   from: string
   date: string
   threadId?: string
+  /** Open tasks come from unread mail */
+  unread: boolean
+  /** If the user already replied in-thread, treat as done */
+  replied?: boolean
 }

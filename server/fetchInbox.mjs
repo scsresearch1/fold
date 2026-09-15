@@ -12,7 +12,7 @@ function decodeAddress(value) {
 }
 
 /**
- * Fetch recent INBOX messages over IMAP.
+ * Fetch unread INBOX messages over IMAP.
  * Shared by the local Express bridge and the Netlify Function.
  */
 export async function fetchInboxMessages({
@@ -21,7 +21,7 @@ export async function fetchInboxMessages({
   secure = true,
   user,
   password,
-  maxResults = 20,
+  maxResults = 30,
 }) {
   if (!host || !user || !password) {
     const error = new Error('IMAP host, email, and password are required.')
@@ -43,14 +43,20 @@ export async function fetchInboxMessages({
     const messages = []
 
     try {
-      const total = client.mailbox?.exists || 0
-      if (total > 0) {
-        const start = Math.max(1, total - Number(maxResults) + 1)
-        for await (const msg of client.fetch(`${start}:${total}`, {
-          uid: true,
-          envelope: true,
-          source: { start: 0, maxLength: 1500 },
-        })) {
+      const unreadUids = await client.search({ seen: false }, { uid: true })
+      const selected = unreadUids.slice(-Number(maxResults))
+
+      if (selected.length > 0) {
+        for await (const msg of client.fetch(
+          selected,
+          {
+            uid: true,
+            flags: true,
+            envelope: true,
+            source: { start: 0, maxLength: 1500 },
+          },
+          { uid: true },
+        )) {
           const subject = msg.envelope?.subject || '(No subject)'
           const from = decodeAddress(msg.envelope?.from)
           const date = msg.envelope?.date
@@ -63,6 +69,8 @@ export async function fetchInboxMessages({
             .replace(/\s+/g, ' ')
             .trim()
             .slice(0, 220)
+          const flags = msg.flags || new Set()
+          const unread = !flags.has('\\Seen')
 
           messages.push({
             id: String(msg.uid),
@@ -70,6 +78,8 @@ export async function fetchInboxMessages({
             from,
             date,
             snippet,
+            unread,
+            replied: false,
           })
         }
       }

@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConnectionSettings, Task } from '../types'
 import { DEMO_TASKS } from '../services/demoEmails'
+import { mergeMailboxTasks } from '../services/emailToTasks'
 import { fetchInboxTasks, requestAccessToken } from '../services/gmail'
 import { fetchImapInbox } from '../services/imapApi'
 import { fetchOutlookInbox, requestOutlookToken } from '../services/outlook'
 import { getProvider, hasUsableConnection } from '../services/settingsStore'
 import { translateEmailToAction } from '../services/actionItems'
-
-const STORAGE_KEY = 'fold-task-completions'
 
 const DEMO_ARRIVALS = [
   {
@@ -26,26 +25,6 @@ const DEMO_ARRIVALS = [
     from: 'Nora Patel',
   },
 ]
-
-function loadCompletions(): Record<string, boolean> {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') as Record<string, boolean>
-  } catch {
-    return {}
-  }
-}
-
-function saveCompletions(map: Record<string, boolean>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(map))
-}
-
-function withSavedState(tasks: Omit<Task, 'completed'>[]): Task[] {
-  const saved = loadCompletions()
-  return tasks.map((task) => ({
-    ...task,
-    completed: Boolean(saved[task.id]),
-  }))
-}
 
 function resolveGoogleClientId(settings: ConnectionSettings) {
   return settings.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -120,34 +99,25 @@ export function useInboxTasks({ settings, onNewTasks }: UseInboxTasksOptions) {
   onNewTasksRef.current = onNewTasks
 
   const announceNew = useCallback((incoming: Task[]) => {
+    const openIncoming = incoming.filter((task) => !task.completed)
+
     if (!baselineReadyRef.current) {
-      for (const task of incoming) seenIdsRef.current.add(task.id)
+      for (const task of openIncoming) seenIdsRef.current.add(task.id)
       baselineReadyRef.current = true
       return
     }
 
-    const fresh = incoming.filter((task) => !seenIdsRef.current.has(task.id))
+    const fresh = openIncoming.filter((task) => !seenIdsRef.current.has(task.id))
     for (const task of fresh) seenIdsRef.current.add(task.id)
     if (fresh.length > 0) {
       onNewTasksRef.current?.(fresh)
     }
   }, [])
 
-  const applyTasks = useCallback(
-    (next: Omit<Task, 'completed'>[], options?: { merge?: boolean }) => {
-      const hydrated = withSavedState(next)
-      setTasks((prev) => {
-        if (!options?.merge) return hydrated
-        const byId = new Map(prev.map((t) => [t.id, t]))
-        for (const task of hydrated) {
-          const existing = byId.get(task.id)
-          byId.set(task.id, existing ? { ...task, completed: existing.completed } : task)
-        }
-        return Array.from(byId.values()).sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-        )
-      })
-      announceNew(hydrated)
+  const applyMailboxSync = useCallback(
+    (incoming: Task[], options?: { replace?: boolean }) => {
+      setTasks((prev) => (options?.replace ? incoming : mergeMailboxTasks(prev, incoming)))
+      announceNew(incoming.filter((task) => !task.completed))
       setLastCheckedAt(new Date().toISOString())
     },
     [announceNew],
@@ -161,8 +131,8 @@ export function useInboxTasks({ settings, onNewTasks }: UseInboxTasksOptions) {
     setConnected(true)
     setError(null)
     setActiveLabel('Demo inbox')
-    applyTasks(DEMO_TASKS)
-  }, [applyTasks])
+    applyMailboxSync(DEMO_TASKS, { replace: true })
+  }, [applyMailboxSync])
 
   const connect = useCallback(async () => {
     setLoading(true)
@@ -184,40 +154,36 @@ export function useInboxTasks({ settings, onNewTasks }: UseInboxTasksOptions) {
       setActiveLabel(
         settings.email ? `${provider.label} · ${settings.email}` : provider.label,
       )
-      applyTasks(result.tasks)
+      applyMailboxSync(result.tasks, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not connect to email')
       setConnected(false)
     } finally {
       setLoading(false)
     }
-  }, [applyTasks, settings])
+  }, [applyMailboxSync, settings])
 
   const refresh = useCallback(
     async (options?: { silent?: boolean }) => {
       if (usingDemo) {
         if (!options?.silent) {
-          // Manual refresh on demo: inject a simulated new email task
           const arrival = makeDemoArrival(demoArrivalRef.current++)
           setTasks((prev) => {
-            const next = [arrival, ...prev]
+            const next = mergeMailboxTasks(prev, [arrival])
+            announceNew([arrival])
+            return next
+          })
+          setLastCheckedAt(new Date().toISOString())
+        } else if (demoArrivalRef.current < DEMO_ARRIVALS.length) {
+          const arrival = makeDemoArrival(demoArrivalRef.current++)
+          setTasks((prev) => {
+            const next = mergeMailboxTasks(prev, [arrival])
             announceNew([arrival])
             return next
           })
           setLastCheckedAt(new Date().toISOString())
         } else {
-          // Silent poll on demo occasionally adds a new task so notifications are visible
-          if (demoArrivalRef.current < DEMO_ARRIVALS.length) {
-            const arrival = makeDemoArrival(demoArrivalRef.current++)
-            setTasks((prev) => {
-              const next = [arrival, ...prev]
-              announceNew([arrival])
-              return next
-            })
-            setLastCheckedAt(new Date().toISOString())
-          } else {
-            setLastCheckedAt(new Date().toISOString())
-          }
+          setLastCheckedAt(new Date().toISOString())
         }
         return
       }
@@ -227,7 +193,7 @@ export function useInboxTasks({ settings, onNewTasks }: UseInboxTasksOptions) {
       try {
         const result = await fetchFromProvider(settings, token)
         setToken(result.token)
-        applyTasks(result.tasks)
+        applyMailboxSync(result.tasks)
       } catch (err) {
         if (!options?.silent) {
           setError(err instanceof Error ? err.message : 'Refresh failed')
@@ -236,38 +202,48 @@ export function useInboxTasks({ settings, onNewTasks }: UseInboxTasksOptions) {
         if (!options?.silent) setLoading(false)
       }
     },
-    [announceNew, applyTasks, settings, token, usingDemo],
+    [announceNew, applyMailboxSync, settings, token, usingDemo],
   )
 
+  // Fast watch for new unread mail while connected
   useEffect(() => {
-    if (!connected || !settings.notificationsEnabled) return
+    if (!connected) return
 
-    const seconds = Math.max(20, settings.pollIntervalSec || 60)
+    const seconds = Math.max(8, settings.pollIntervalSec || 10)
     const id = window.setInterval(() => {
       void refresh({ silent: true })
     }, seconds * 1000)
 
     return () => window.clearInterval(id)
-  }, [connected, refresh, settings.notificationsEnabled, settings.pollIntervalSec])
+  }, [connected, refresh, settings.pollIntervalSec])
+
+  // Check immediately when the tab becomes visible / focused
+  useEffect(() => {
+    if (!connected) return
+
+    const kick = () => {
+      if (document.visibilityState === 'visible') {
+        void refresh({ silent: true })
+      }
+    }
+
+    document.addEventListener('visibilitychange', kick)
+    window.addEventListener('focus', kick)
+    return () => {
+      document.removeEventListener('visibilitychange', kick)
+      window.removeEventListener('focus', kick)
+    }
+  }, [connected, refresh])
 
   const toggleTask = useCallback((id: string) => {
-    setTasks((prev) => {
-      const next = prev.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task,
-      )
-      const map = Object.fromEntries(next.map((t) => [t.id, t.completed]))
-      saveCompletions(map)
-      return next
-    })
+    // Local mark complete ≈ "I've handled / read this"
+    setTasks((prev) =>
+      prev.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task)),
+    )
   }, [])
 
   const clearCompleted = useCallback(() => {
-    setTasks((prev) => {
-      const next = prev.filter((task) => !task.completed)
-      const map = Object.fromEntries(next.map((t) => [t.id, t.completed]))
-      saveCompletions(map)
-      return next
-    })
+    setTasks((prev) => prev.filter((task) => !task.completed))
   }, [])
 
   const disconnect = useCallback(() => {
